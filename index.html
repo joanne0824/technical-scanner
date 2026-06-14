@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台股技術分析篩選</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0f14;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    padding: 16px;
+  }
+  .header {
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+  .title { font-size: 20px; font-weight: 700; color: #ff9f43; }
+  .subtitle { font-size: 12px; color: #666; margin-top: 4px; }
+  .update-time { font-size: 11px; color: #555; margin-top: 8px; }
+  .no-data { color: #666; text-align: center; padding: 40px; }
+
+  /* 評分說明 */
+  .score-legend {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 20px;
+  }
+  .score-legend-title {
+    font-size: 12px; font-weight: 700;
+    color: #ff9f43; margin-bottom: 10px;
+  }
+  .legend-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;
+  }
+  .legend-item { font-size: 11px; color: #888; display: flex; gap: 6px; }
+  .legend-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  .dot-orange { background: #ff9f43; }
+  .dot-blue   { background: #4ea8de; }
+  .dot-green  { background: #69db7c; }
+
+  /* 分類標籤 */
+  .section-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 12px; margin-top: 20px;
+  }
+  .section-label {
+    font-size: 13px; font-weight: 700;
+    padding: 4px 12px; border-radius: 20px;
+  }
+  .label-active {
+    background: rgba(105,219,124,0.15); color: #69db7c;
+    border: 1px solid rgba(105,219,124,0.3);
+  }
+  .label-watch {
+    background: rgba(255,159,67,0.15); color: #ff9f43;
+    border: 1px solid rgba(255,159,67,0.3);
+  }
+  .section-count { font-size: 12px; color: #555; }
+
+  /* 卡片 */
+  .card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 16px; margin-bottom: 12px;
+  }
+  .card-active { border-left: 3px solid rgba(105,219,124,0.6); }
+  .card-watch  { border-left: 3px solid rgba(255,159,67,0.4); }
+
+  .card-header {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; margin-bottom: 12px;
+  }
+  .stock-name { font-size: 16px; font-weight: 700; color: #fff; }
+  .stock-code { font-size: 12px; color: #888; margin-top: 2px; }
+
+  /* 總分顯示 */
+  .total-score {
+    text-align: right;
+  }
+  .score-number {
+    font-size: 22px; font-weight: 700;
+  }
+  .score-max { font-size: 11px; color: #666; }
+  .score-high { color: #69db7c; }
+  .score-mid  { color: #ff9f43; }
+  .score-low  { color: #ff6b6b; }
+
+  /* 發動訊號 */
+  .signal-badge {
+    display: inline-block;
+    font-size: 11px; font-weight: 700;
+    padding: 3px 10px; border-radius: 12px;
+    margin-top: 4px;
+  }
+  .signal-active {
+    background: rgba(105,219,124,0.15); color: #69db7c;
+    border: 1px solid rgba(105,219,124,0.3);
+  }
+  .signal-wait {
+    background: rgba(100,100,100,0.15); color: #888;
+    border: 1px solid rgba(100,100,100,0.3);
+  }
+  .signal-ma {
+    background: rgba(78,168,222,0.15); color: #4ea8de;
+    border: 1px solid rgba(78,168,222,0.3);
+    margin-left: 4px;
+  }
+
+  /* 分數條 */
+  .score-bars { margin-bottom: 12px; }
+  .score-bar-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 6px;
+  }
+  .score-bar-label { font-size: 10px; color: #666; width: 80px; flex-shrink: 0; }
+  .score-bar-track {
+    flex: 1; height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px; overflow: hidden;
+  }
+  .score-bar-fill {
+    height: 100%; border-radius: 3px;
+    transition: width 0.3s;
+  }
+  .bar-consolidation { background: #ff9f43; }
+  .bar-momentum     { background: #4ea8de; }
+  .score-bar-value { font-size: 10px; color: #888; width: 30px; text-align: right; flex-shrink: 0; }
+
+  /* 指標格 */
+  .metrics {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 8px; margin-bottom: 12px;
+  }
+  .metric {
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px; padding: 8px; text-align: center;
+  }
+  .metric-label { font-size: 10px; color: #666; margin-bottom: 4px; }
+  .metric-value { font-size: 13px; font-weight: 700; }
+  .positive { color: #69db7c; }
+  .negative { color: #ff6b6b; }
+  .neutral  { color: #e0e0e0; }
+  .warning  { color: #ffd43b; }
+  .orange   { color: #ff9f43; }
+
+  /* 區間條 */
+  .range-bar-wrap { margin-bottom: 10px; }
+  .range-label {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: #666; margin-bottom: 4px;
+  }
+  .range-bar {
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px; height: 8px;
+    position: relative; overflow: visible;
+  }
+  .range-fill {
+    height: 100%; border-radius: 4px;
+    background: linear-gradient(90deg, #ff9f4333, #69db7c33);
+  }
+  .range-marker {
+    position: absolute; top: -3px;
+    width: 3px; height: 14px;
+    background: #fff; border-radius: 2px;
+  }
+
+  .divider { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 10px 0; }
+  .tag-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .tag {
+    font-size: 10px; padding: 2px 8px;
+    border-radius: 6px; background: rgba(255,255,255,0.05); color: #888;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">台股技術分析篩選</div>
+  <div class="subtitle">均線糾結 · 布林收窄 · ATR低波動 · 發動訊號偵測</div>
+  <div class="update-time" id="update-time">載入中...</div>
+</div>
+
+<!-- 評分說明 -->
+<div class="score-legend">
+  <div class="score-legend-title">📊 技術評分說明（滿分115分）</div>
+  <div class="legend-grid">
+    <div class="legend-item"><div class="legend-dot dot-orange"></div>均線糾結（25分）三線差距越小越好</div>
+    <div class="legend-item"><div class="legend-dot dot-orange"></div>布林帶收窄（20分）近120日前10%最佳</div>
+    <div class="legend-item"><div class="legend-dot dot-orange"></div>ATR低波動（15分）近120日前10%最佳</div>
+    <div class="legend-item"><div class="legend-dot dot-blue"></div>量能狀態（15分）60~90%量縮最佳</div>
+    <div class="legend-item"><div class="legend-dot dot-blue"></div>價格位置（15分）季線上方0~8%最佳</div>
+    <div class="legend-item"><div class="legend-dot dot-blue"></div>動能（10分）0~3%微漲最佳</div>
+    <div class="legend-item"><div class="legend-dot dot-green"></div>突破布林上軌 +10分</div>
+    <div class="legend-item"><div class="legend-dot dot-green"></div>均線多頭排列 +5分</div>
+  </div>
+</div>
+
+<div id="content">
+  <div class="no-data">載入資料中...</div>
+</div>
+
+<script>
+fetch('data.json?t=' + Date.now())
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('update-time').textContent =
+      '更新時間：' + data.update_time;
+
+    const content = document.getElementById('content');
+    if (!data.stocks || data.stocks.length === 0) {
+      content.innerHTML = '<div class="no-data">今日無符合條件股票</div>';
+      return;
+    }
+
+    const active = data.stocks.filter(s => s['發動訊號']);
+    const watch  = data.stocks.filter(s => !s['發動訊號']);
+
+    const renderCards = (stocks, cardClass) => stocks.map(s => {
+      const total    = parseFloat(s['總分']) || 0;
+      const consol   = parseFloat(s['盤整分數']) || 0
+      const momentum = parseFloat(s['發動分數']) || 0;
+      const scoreClass = total >= 80 ? 'score-high' : total >= 60 ? 'score-mid' : 'score-low';
+
+      const gain5d   = parseFloat(s['5日漲幅%']) || 0;
+      const dist60   = parseFloat(s['距季線%'])  || 0;
+      const volRatio = parseFloat(s['量縮比'])   || 0;
+
+      return `
+      <div class="card ${cardClass}">
+        <div class="card-header">
+          <div>
+            <div class="stock-name">${s['名稱']}</div>
+            <div class="stock-code">${s['代碼']}</div>
+          </div>
+          <div class="total-score">
+            <div class="score-number ${scoreClass}">${total}</div>
+            <div class="score-max">/ 115分</div>
+            <div>
+              <span class="signal-badge ${s['發動訊號'] ? 'signal-active' : 'signal-wait'}">
+                ${s['發動訊號'] ? '▲ 已突破' : '⏳ 等待中'}
+              </span>
+              ${s['均線多頭'] ? '<span class="signal-badge signal-ma">多頭排列</span>' : ''}
+            </div>
+          </div>
+        </div>
+
+        <!-- 分數條 -->
+        <div class="score-bars">
+          <div class="score-bar-row">
+            <div class="score-bar-label">盤整品質</div>
+            <div class="score-bar-track">
+              <div class="score-bar-fill bar-consolidation"
+                   style="width:${consol/60*100}%"></div>
+            </div>
+            <div class="score-bar-value">${consol}/60</div>
+          </div>
+          <div class="score-bar-row">
+            <div class="score-bar-label">發動條件</div>
+            <div class="score-bar-track">
+              <div class="score-bar-fill bar-momentum"
+                   style="width:${momentum/40*100}%"></div>
+            </div>
+            <div class="score-bar-value">${momentum}/40</div>
+          </div>
+        </div>
+
+        <!-- 指標格 -->
+        <div class="metrics">
+          <div class="metric">
+            <div class="metric-label">收盤價</div>
+            <div class="metric-value neutral">${s['收盤價']}</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">均線糾結</div>
+            <div class="metric-value ${parseFloat(s['均線糾結%'])<3?'positive':parseFloat(s['均線糾結%'])<6?'warning':'negative'}">
+              ${s['均線糾結%']}%
+            </div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">布林帶分位</div>
+            <div class="metric-value ${parseFloat(s['布林帶分位%'])<10?'positive':parseFloat(s['布林帶分位%'])<20?'warning':'neutral'}">
+              ${s['布林帶分位%']}%
+            </div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">ATR分位</div>
+            <div class="metric-value ${parseFloat(s['ATR分位%'])<10?'positive':parseFloat(s['ATR分位%'])<25?'warning':'neutral'}">
+              ${s['ATR分位%']}%
+            </div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">量縮比</div>
+            <div class="metric-value ${volRatio<0.9?'positive':volRatio<1.1?'neutral':'warning'}">
+              ${volRatio}x
+            </div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">距季線</div>
+            <div class="metric-value ${dist60>0&&dist60<8?'positive':dist60>15?'warning':'neutral'}">
+              ${dist60>0?'+':''}${dist60}%
+            </div>
+          </div>
+        </div>
+
+        <!-- 季線位置條 -->
+        <div class="range-bar-wrap">
+          <div class="range-label">
+            <span>季線 ${s['60MA']}</span>
+            <span>5日漲幅 ${gain5d>=0?'+':''}${gain5d}%</span>
+            <span>現價 ${s['收盤價']}</span>
+          </div>
+          <div class="range-bar">
+            <div class="range-fill" style="width:100%"></div>
+          </div>
+        </div>
+
+        <hr class="divider">
+
+        <div class="tag-row">
+          <span class="tag">均線糾結 ${s['均線糾結分']}分</span>
+          <span class="tag">布林 ${s['布林帶分']}分</span>
+          <span class="tag">ATR ${s['ATR分']}分</span>
+          <span class="tag">量能 ${s['量能分']}分</span>
+          <span class="tag">位置 ${s['位置分']}分</span>
+          <span class="tag">動能 ${s['動能分']}分</span>
+          ${s['加分項'] > 0 ? `<span class="tag" style="color:#69db7c">加分 +${s['加分項']}</span>` : ''}
+          <span class="tag">月均量 ${Math.round(s['月均量張'])}張</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    content.innerHTML = `
+      <div class="section-header">
+        <span class="section-label label-active">已發動</span>
+        <span class="section-count">${active.length} 檔｜突破布林上軌</span>
+      </div>
+      ${active.length > 0
+        ? renderCards(active, 'card-active')
+        : '<div class="no-data" style="padding:16px">今日無已發動股票</div>'
+      }
+      <div class="section-header">
+        <span class="section-label label-watch">蓄勢待發</span>
+        <span class="section-count">${watch.length} 檔｜等待突破</span>
+      </div>
+      ${watch.length > 0
+        ? renderCards(watch, 'card-watch')
+        : '<div class="no-data" style="padding:16px">今日無蓄勢股票</div>'
+      }
+    `;
+  })
+  .catch(() => {
+    document.getElementById('update-time').textContent = '尚無資料';
+    document.getElementById('content').innerHTML =
+      '<div class="no-data">尚未有今日資料，請稍後再試</div>';
+  });
+</script>
+</body>
+</html>
